@@ -4,6 +4,8 @@
 import express from "express";
 import fs      from "fs";
 import path    from "path";
+import https   from "https";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
@@ -59,7 +61,43 @@ app.get("*", (req, res) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`Calendar running on http://localhost:${PORT}`);
-  console.log(`Events stored at: ${DATA_FILE}`);
-});
+const getLocalIP = () => {
+  try {
+    const output = execSync("hostname -I").toString().trim().split(" ")[0];
+    return output || "0.0.0.0";
+  } catch {
+    return "0.0.0.0";
+  }
+};
+
+const certFile = path.join(__dirname, "server.crt");
+const keyFile = path.join(__dirname, "server.key");
+
+if (!fs.existsSync(certFile) || !fs.existsSync(keyFile)) {
+  try {
+    execSync(
+      `openssl req -x509 -newkey rsa:2048 -nodes -out ${certFile} -keyout ${keyFile} -days 365 -subj "/CN=localhost"`
+    );
+    console.log("Generated self-signed certificate");
+  } catch (err) {
+    console.error("Failed to generate certificate:", err.message);
+  }
+}
+
+const localIP = getLocalIP();
+
+if (fs.existsSync(certFile) && fs.existsSync(keyFile)) {
+  const options = {
+    key: fs.readFileSync(keyFile),
+    cert: fs.readFileSync(certFile),
+  };
+  https.createServer(options, app).listen(PORT, "0.0.0.0", () => {
+    console.log(`Calendar running on https://${localIP}:${PORT}`);
+    console.log(`Events stored at: ${DATA_FILE}`);
+  });
+} else {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Calendar running on http://${localIP}:${PORT}`);
+    console.log(`Events stored at: ${DATA_FILE}`);
+  });
+}
