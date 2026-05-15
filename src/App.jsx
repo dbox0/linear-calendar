@@ -139,7 +139,7 @@ export default function LinearCalendar() {
             const isToday = diff === 0;
             const isPast  = diff < 0;
             const isWE    = day.getDay() === 0 || day.getDay() === 6;
-            const weeks   = Math.ceil(diff / 7);
+            const weeks   = Math.floor(diff / 7);
             return (
               <div key={dk} className="day-col">
                 {monthBreaks.has(idx) && (
